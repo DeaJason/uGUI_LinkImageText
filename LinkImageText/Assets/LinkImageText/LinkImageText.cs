@@ -66,11 +66,45 @@ public class LinkImageText : Text, IPointerClickHandler
     private static readonly Regex s_HrefRegex =
         new Regex(@"<a href=([^>\n\s]+)>(.*?)(</a>)", RegexOptions.Singleline);
 
+
+    private static readonly Regex s_ColorRegex2 =
+    new Regex(@"<color=([^>\n\s]+)>|</color>");
+    private static readonly Regex s_BoldfaceRegex2 =
+new Regex(@"<b>|</b>");
+    private static readonly Regex s_ItalicsRegex2 =
+new Regex(@"<i>|</i>");
+    private static readonly Regex s_SizeRegex2 =
+new Regex(@"<size=([^>\n\s]+)>|</size>");
+    private static readonly Regex s_MaterialRegex2 =
+new Regex(@"<material=([^>\n\s]+)>|</material>");
+    private static readonly Regex s_QuadRegex2 =
+new Regex(@"<quad name=(.+?) size=(\d*\.?\d+%?) width=(\d*\.?\d+%?) />");
+    private static readonly Regex s_HrefRegex2 =
+new Regex(@"<a href=([^>\n\s]+)>|(</a>)");
+
     /// <summary>
     /// 加载精灵图片方法
     /// </summary>
     public static Func<string, Sprite> funLoadSprite;
 
+    public override string text
+    {
+        get
+        {
+            return base.text;
+        }
+
+        set
+        {
+            if (m_Text != value)
+            {
+                //文本内容发生变化，初始化相关数据
+                OnTextChange(value);
+            }
+            base.text = value;
+
+        }
+    }
     public override void SetVerticesDirty()
     {
         base.SetVerticesDirty();
@@ -212,30 +246,9 @@ public class LinkImageText : Text, IPointerClickHandler
     /// <returns></returns>
     protected virtual string GetOutputText(string outputText)
     {
-        s_TextBuilder.Length = 0;
-        m_HrefInfos.Clear();
-        var indexText = 0;
-        foreach (Match match in s_HrefRegex.Matches(outputText))
-        {
-            s_TextBuilder.Append(outputText.Substring(indexText, match.Index - indexText));
-            s_TextBuilder.Append("<color=blue>");  // 超链接颜色
-
-            var group = match.Groups[1];
-            var hrefInfo = new HrefInfo
-            {
-                startIndex = s_TextBuilder.Length * 4, // 超链接里的文本起始顶点索引
-                endIndex = (s_TextBuilder.Length + match.Groups[2].Length - 1) * 4 + 3,
-                name = group.Value
-            };
-            m_HrefInfos.Add(hrefInfo);
-
-            s_TextBuilder.Append(match.Groups[2].Value);
-            s_TextBuilder.Append("</color>");
-            indexText = match.Index + match.Length;
-        }
-        s_TextBuilder.Append(outputText.Substring(indexText, outputText.Length - indexText));
-        return s_TextBuilder.ToString();
+        return s_HrefRegex2.Replace(outputText, "");
     }
+
 
     /// <summary>
     /// 点击事件检测是否点击到超链接文本
@@ -259,6 +272,40 @@ public class LinkImageText : Text, IPointerClickHandler
                 }
             }
         }
+    }
+
+    string GetHrefTextConten(string content)
+    {
+        var tempStr = s_ColorRegex2.Replace(content, "");
+        tempStr = s_BoldfaceRegex2.Replace(tempStr, "");
+        tempStr = s_ItalicsRegex2.Replace(tempStr, "");
+        tempStr = s_SizeRegex2.Replace(tempStr, "");
+        tempStr = s_MaterialRegex2.Replace(tempStr, "");
+        tempStr = s_QuadRegex2.Replace(tempStr, "");
+        return tempStr;
+    }
+
+    void InitHrefData(string newTextContent)
+    {
+        string hrefTextContent = GetHrefTextConten(newTextContent);
+        m_HrefInfos.Clear();
+        foreach (Match match in s_HrefRegex.Matches(hrefTextContent))
+        {
+            var group = match.Groups[1];
+            var hrefInfo = new HrefInfo
+            {
+                startIndex = match.Index * 4, // 超链接里的文本起始顶点索引
+                endIndex = (match.Index + match.Groups[2].Length - 1) * 4 + 3,
+                name = group.Value
+            };
+            m_HrefInfos.Add(hrefInfo);
+        }
+    }
+
+    void OnTextChange(string newTextContent)
+    {
+        //初始化超链相关数据
+        InitHrefData(newTextContent);
     }
 
     /// <summary>
